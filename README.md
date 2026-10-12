@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ToDo リスト
 
-## Getting Started
+シンプルで見やすく、操作しやすい ToDo リスト Web アプリです。
 
-First, run the development server:
+**公開 URL**：https://todo-list-app-cyan-eight.vercel.app
+
+## 機能
+
+- **タスクの追加**：入力欄に書いて「追加」ボタンまたは Enter キー（空欄・空白のみは追加不可）
+- **完了チェック**：チェックボックスで切り替え。完了したタスクは取り消し線で表示
+- **タスクの削除**：ゴミ箱ボタンで削除。完了済みタスクのまとめて削除にも対応
+- **削除の取り消し**：削除後 5 秒間「元に戻す」ボタンを表示
+- **データの保存**：ブラウザの localStorage に保存され、ブラウザを閉じても残ります（別タブの変更も反映）
+
+> データは各ブラウザ内にのみ保存されます。別の端末・ブラウザとは共有されません。
+
+## UI/UX の工夫
+
+| よくある落とし穴 | 対策 |
+| --- | --- |
+| ボタンが小さく押しにくい | ボタンの高さを 44px 以上に。タスク名を押してもチェックが切り替わる |
+| 文字が薄くて読みにくい | 文字色と背景色のコントラストを十分に確保 |
+| 操作しても反応が分からない | 残り件数を常に表示。入力が空のときは「追加」ボタンを無効化 |
+| 削除をやり直せない | 確認ダイアログの代わりに「元に戻す」を用意 |
+| タスクがゼロのとき画面が真っ白 | 何をすればよいかの案内を表示 |
+
+ほかにも、入力欄のラベル、キーボード操作時のフォーカス表示、読み上げソフト向けのボタン名に対応しています。
+
+## 使用技術
+
+- [Next.js](https://nextjs.org)（App Router）
+- TypeScript
+- Tailwind CSS
+- [Vercel](https://vercel.com)（ホスティング）
+
+## ローカルでの起動方法
+
+Node.js が必要です。
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで http://localhost:3000 を開きます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### その他のコマンド
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| コマンド | 内容 |
+| --- | --- |
+| `npm run build` | 本番用にビルド |
+| `npm run start` | ビルドしたアプリを起動 |
+| `npm run lint` | ESLint でコードをチェック |
 
-## Learn More
+## ディレクトリ構成
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── layout.tsx       # 全体のレイアウト（日本語設定・フォント）
+│   ├── page.tsx         # トップページ
+│   └── globals.css      # 全体のスタイル
+├── components/
+│   └── TodoApp.tsx      # ToDo リストの画面
+└── lib/
+    └── todo-store.ts    # タスクの保存・読み込み（localStorage）
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## デプロイ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GitHub の `main` ブランチに push すると、Vercel に自動でデプロイされます。
