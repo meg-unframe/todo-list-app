@@ -16,6 +16,36 @@ const FILTER_LABELS: Record<Filter, string> = {
   completed: "完了済み",
 };
 
+type Sort = "added" | "priority" | "dueDate";
+
+const SORT_LABELS: Record<Sort, string> = {
+  added: "追加順（新しい順）",
+  priority: "優先度順（高→低）",
+  dueDate: "期限順（近い順）",
+};
+
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+
+function comparePriority(a: Todo, b: Todo) {
+  return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+}
+
+// 期限なしは最後に並べる。"YYYY-MM-DD" は文字列比較で日付順になる
+function compareDueDate(a: Todo, b: Todo) {
+  if (a.dueDate === b.dueDate) return 0;
+  if (a.dueDate === null) return 1;
+  if (b.dueDate === null) return -1;
+  return a.dueDate < b.dueDate ? -1 : 1;
+}
+
+/** 表示用に並べ替える（保存されている順番は変えない）。同順位は追加順のまま */
+function sortTodos(todos: Todo[], sort: Sort) {
+  if (sort === "added") return todos;
+  const primary = sort === "priority" ? comparePriority : compareDueDate;
+  const secondary = sort === "priority" ? compareDueDate : comparePriority;
+  return [...todos].sort((a, b) => primary(a, b) || secondary(a, b));
+}
+
 const PRIORITY_LABELS: Record<Priority, string> = { high: "高", medium: "中", low: "低" };
 
 const PRIORITY_BADGE_STYLES: Record<Priority, string> = {
@@ -36,6 +66,7 @@ export default function TodoApp() {
   const [priority, setPriority] = useState<Priority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("added");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,8 +86,10 @@ export default function TodoApp() {
     active: remaining,
     completed,
   };
-  const visibleTodos =
-    todos?.filter((t) => (filter === "all" ? true : filter === "active" ? !t.done : t.done)) ?? [];
+  const visibleTodos = sortTodos(
+    todos?.filter((t) => (filter === "all" ? true : filter === "active" ? !t.done : t.done)) ?? [],
+    sort,
+  );
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -147,6 +180,24 @@ export default function TodoApp() {
       ) : (
         <>
           <FilterTabs filter={filter} counts={counts} onChange={setFilter} />
+
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <label htmlFor="sort" className="shrink-0 text-sm font-semibold text-slate-800">
+              並び順
+            </label>
+            <select
+              id="sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+            >
+              {(Object.keys(SORT_LABELS) as Sort[]).map((s) => (
+                <option key={s} value={s}>
+                  {SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {visibleTodos.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-300 px-6 py-10 text-center text-base text-slate-600">
