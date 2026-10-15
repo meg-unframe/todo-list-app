@@ -108,6 +108,9 @@ export const todoActions = {
     };
     save([todo, ...getSnapshot()]);
   },
+  update(id: string, changes: Partial<Pick<Todo, "priority" | "dueDate">>) {
+    save(getSnapshot().map((t) => (t.id === id ? { ...t, ...changes } : t)));
+  },
   toggle(id: string) {
     save(getSnapshot().map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   },

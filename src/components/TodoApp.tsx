@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { PRIORITIES, todoActions, useTodos, type Priority, type Todo } from "@/lib/todo-store";
 
 const MAX_LENGTH = 100;
@@ -36,6 +36,7 @@ export default function TodoApp() {
   const [priority, setPriority] = useState<Priority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -134,51 +135,8 @@ export default function TodoApp() {
         <p className="mt-2 text-sm text-slate-600">Enter キーでも追加できます</p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <fieldset>
-            <legend className="mb-2 text-sm font-semibold text-slate-800">優先度</legend>
-            <div className="grid grid-cols-3 gap-2">
-              {PRIORITIES.map((p) => (
-                <label
-                  key={p}
-                  className={`flex h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-base font-medium text-slate-700 transition-colors hover:bg-slate-50 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-blue-600 ${PRIORITY_CHECKED_STYLES[p]}`}
-                >
-                  <input
-                    type="radio"
-                    name="priority"
-                    value={p}
-                    checked={priority === p}
-                    onChange={() => setPriority(p)}
-                    className="sr-only"
-                  />
-                  {PRIORITY_LABELS[p]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div>
-            <label htmlFor="new-todo-due" className="mb-2 block text-sm font-semibold text-slate-800">
-              期限 <span className="font-normal text-slate-600">（任意）</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="new-todo-due"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
-              />
-              {dueDate && (
-                <button
-                  type="button"
-                  onClick={() => setDueDate("")}
-                  className="h-11 shrink-0 rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
-                >
-                  クリア
-                </button>
-              )}
-            </div>
-          </div>
+          <PriorityPicker value={priority} onChange={setPriority} />
+          <DueDateField id="new-todo-due" label="期限" value={dueDate} onChange={setDueDate} />
         </div>
       </form>
 
@@ -200,7 +158,10 @@ export default function TodoApp() {
                 <TodoItem
                   key={todo.id}
                   todo={todo}
+                  editing={editingId === todo.id}
                   onToggle={() => todoActions.toggle(todo.id)}
+                  onEdit={() => setEditingId(todo.id)}
+                  onCloseEdit={() => setEditingId(null)}
                   onDelete={() => handleDelete(todo)}
                 />
               ))}
@@ -228,56 +189,207 @@ export default function TodoApp() {
 
 function TodoItem({
   todo,
+  editing,
   onToggle,
+  onEdit,
+  onCloseEdit,
   onDelete,
 }: {
   todo: Todo;
+  editing: boolean;
   onToggle: () => void;
+  onEdit: () => void;
+  onCloseEdit: () => void;
   onDelete: () => void;
 }) {
   const checkboxId = `todo-${todo.id}`;
+  const panelId = `todo-edit-${todo.id}`;
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 編集を閉じたら編集ボタンにフォーカスを戻す
+  function closeEdit() {
+    onCloseEdit();
+    editButtonRef.current?.focus();
+  }
+
   return (
-    <li className="group flex items-center gap-1 pr-2 transition-colors hover:bg-slate-50">
-      {/* ラベル全体をクリック可能にしてタップ領域を広げる */}
-      <label
-        htmlFor={checkboxId}
-        className="flex min-h-14 flex-1 cursor-pointer items-center gap-3 py-3 pl-4"
-      >
-        <input
-          id={checkboxId}
-          type="checkbox"
-          checked={todo.done}
-          onChange={onToggle}
-          className="size-5 shrink-0 cursor-pointer accent-blue-600"
-        />
-        <span className="flex min-w-0 flex-col gap-1">
-          <span
-            className={`break-all text-base ${
-              todo.done ? "text-slate-500 line-through" : "text-slate-900"
-            }`}
-          >
-            {todo.title}
-          </span>
-          <span className="flex flex-wrap items-center gap-2 text-sm">
+    <li className={editing ? "bg-slate-50 pb-4" : "transition-colors hover:bg-slate-50"}>
+      <div className="flex items-center gap-1 pr-2">
+        {/* ラベル全体をクリック可能にしてタップ領域を広げる */}
+        <label
+          htmlFor={checkboxId}
+          className="flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 pl-4"
+        >
+          <input
+            id={checkboxId}
+            type="checkbox"
+            checked={todo.done}
+            onChange={onToggle}
+            className="size-5 shrink-0 cursor-pointer accent-blue-600"
+          />
+          <span className="flex min-w-0 flex-col gap-1">
             <span
-              className={`rounded px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${PRIORITY_BADGE_STYLES[todo.priority]}`}
+              className={`break-all text-base ${
+                todo.done ? "text-slate-500 line-through" : "text-slate-900"
+              }`}
             >
-              優先度 {PRIORITY_LABELS[todo.priority]}
+              {todo.title}
             </span>
-            {todo.dueDate && <DueDate dueDate={todo.dueDate} done={todo.done} />}
+            <span className="flex flex-wrap items-center gap-2 text-sm">
+              <span
+                className={`rounded px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${PRIORITY_BADGE_STYLES[todo.priority]}`}
+              >
+                優先度 {PRIORITY_LABELS[todo.priority]}
+              </span>
+              {todo.dueDate && <DueDate dueDate={todo.dueDate} done={todo.done} />}
+            </span>
           </span>
-        </span>
-      </label>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label={`「${todo.title}」を削除`}
-        title="削除"
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-blue-600"
-      >
-        <TrashIcon />
-      </button>
+        </label>
+        <button
+          ref={editButtonRef}
+          type="button"
+          onClick={editing ? closeEdit : onEdit}
+          aria-label={`「${todo.title}」の優先度と期限を編集`}
+          aria-expanded={editing}
+          aria-controls={editing ? panelId : undefined}
+          title="編集"
+          className={`flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600 ${
+            editing ? "bg-blue-50 text-blue-700" : "text-slate-500"
+          }`}
+        >
+          <PencilIcon />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`「${todo.title}」を削除`}
+          title="削除"
+          className="flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-blue-600"
+        >
+          <TrashIcon />
+        </button>
+      </div>
+
+      {editing && <EditPanel id={panelId} todo={todo} onClose={closeEdit} />}
     </li>
+  );
+}
+
+function EditPanel({ id, todo, onClose }: { id: string; todo: Todo; onClose: () => void }) {
+  const [priority, setPriority] = useState(todo.priority);
+  const [dueDate, setDueDate] = useState(todo.dueDate ?? "");
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // 開いたら選択中の優先度にフォーカスし、キーボードですぐ操作できるようにする
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
+  }, []);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    todoActions.update(todo.id, { priority, dueDate: dueDate || null });
+    onClose();
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape") onClose();
+  }
+
+  return (
+    <form
+      ref={formRef}
+      id={id}
+      onSubmit={handleSubmit}
+      onKeyDown={handleKeyDown}
+      aria-label={`「${todo.title}」の編集`}
+      className="mx-4 rounded-lg border border-slate-200 bg-white p-4"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <PriorityPicker value={priority} onChange={setPriority} />
+        <DueDateField id={`${id}-due`} label="期限" value={dueDate} onChange={setDueDate} />
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-11 rounded-lg px-4 text-base font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+        >
+          キャンセル
+        </button>
+        <button
+          type="submit"
+          className="h-11 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+        >
+          保存
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PriorityPicker({ value, onChange }: { value: Priority; onChange: (p: Priority) => void }) {
+  // 追加フォームと編集欄が同時に表示されるため、ラジオボタンのグループ名を個別にする
+  const name = useId();
+  return (
+    <fieldset>
+      <legend className="mb-2 text-sm font-semibold text-slate-800">優先度</legend>
+      <div className="grid grid-cols-3 gap-2">
+        {PRIORITIES.map((p) => (
+          <label
+            key={p}
+            className={`flex h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-base font-medium text-slate-700 transition-colors hover:bg-slate-50 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-blue-600 ${PRIORITY_CHECKED_STYLES[p]}`}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={p}
+              checked={value === p}
+              onChange={() => onChange(p)}
+              className="sr-only"
+            />
+            {PRIORITY_LABELS[p]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function DueDateField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-sm font-semibold text-slate-800">
+        {label} <span className="font-normal text-slate-600">（任意）</span>
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={id}
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="h-11 shrink-0 rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+          >
+            クリア
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -390,6 +502,25 @@ function UndoToast({
         </div>
       )}
     </div>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-5"
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 
