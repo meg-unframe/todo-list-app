@@ -24,6 +24,30 @@ const SORT_LABELS: Record<Sort, string> = {
   dueDate: "期限順（近い順）",
 };
 
+const SORT_STORAGE_KEY = "todo-list-app:sort";
+
+function isSort(value: unknown): value is Sort {
+  return typeof value === "string" && Object.hasOwn(SORT_LABELS, value);
+}
+
+// 一覧はブラウザで読み込んだ後にしか表示されないため、ここで localStorage を読んでも表示は食い違わない
+function loadSort(): Sort {
+  try {
+    const saved = window.localStorage.getItem(SORT_STORAGE_KEY);
+    return isSort(saved) ? saved : "added";
+  } catch {
+    return "added";
+  }
+}
+
+function saveSort(sort: Sort) {
+  try {
+    window.localStorage.setItem(SORT_STORAGE_KEY, sort);
+  } catch {
+    // 保存できなくても画面上の並べ替えは続けられるようにする
+  }
+}
+
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
 function comparePriority(a: Todo, b: Todo) {
@@ -66,7 +90,9 @@ export default function TodoApp() {
   const [priority, setPriority] = useState<Priority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("added");
+  const [sort, setSort] = useState<Sort>(() =>
+    typeof window === "undefined" ? "added" : loadSort(),
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +125,12 @@ export default function TodoApp() {
     setPriority("medium");
     setDueDate("");
     inputRef.current?.focus();
+  }
+
+  function handleSortChange(value: string) {
+    if (!isSort(value)) return;
+    setSort(value);
+    saveSort(value);
   }
 
   function handleDelete(todo: Todo) {
@@ -188,7 +220,7 @@ export default function TodoApp() {
             <select
               id="sort"
               value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
+              onChange={(e) => handleSortChange(e.target.value)}
               className="h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
             >
               {(Object.keys(SORT_LABELS) as Sort[]).map((s) => (
