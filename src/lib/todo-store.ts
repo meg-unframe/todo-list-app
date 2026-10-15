@@ -2,27 +2,49 @@
 
 import { useSyncExternalStore } from "react";
 
+export type Priority = "high" | "medium" | "low";
+
+export const PRIORITIES: Priority[] = ["high", "medium", "low"];
+
 export type Todo = {
   id: string;
   title: string;
   done: boolean;
   createdAt: number;
+  priority: Priority;
+  /** 締切日（"YYYY-MM-DD"）。未設定は null */
+  dueDate: string | null;
 };
+
+export type NewTodo = Pick<Todo, "title" | "priority" | "dueDate">;
 
 const STORAGE_KEY = "todo-list-app:todos";
 
 const listeners = new Set<() => void>();
 let cache: Todo[] | null = null;
 
-function isTodo(value: unknown): value is Todo {
-  if (typeof value !== "object" || value === null) return false;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+// 優先度・期限が追加される前に保存されたタスクも、既定値を補って読み込む
+function toTodo(value: unknown): Todo | null {
+  if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.id === "string" &&
-    typeof v.title === "string" &&
-    typeof v.done === "boolean" &&
-    typeof v.createdAt === "number"
-  );
+  if (
+    typeof v.id !== "string" ||
+    typeof v.title !== "string" ||
+    typeof v.done !== "boolean" ||
+    typeof v.createdAt !== "number"
+  ) {
+    return null;
+  }
+  return {
+    id: v.id,
+    title: v.title,
+    done: v.done,
+    createdAt: v.createdAt,
+    priority: PRIORITIES.includes(v.priority as Priority) ? (v.priority as Priority) : "medium",
+    dueDate: typeof v.dueDate === "string" && DATE_PATTERN.test(v.dueDate) ? v.dueDate : null,
+  };
 }
 
 function load(): Todo[] {
@@ -30,7 +52,8 @@ function load(): Todo[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isTodo) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(toTodo).filter((t): t is Todo => t !== null);
   } catch {
     return [];
   }
@@ -74,12 +97,14 @@ function save(next: Todo[]) {
 }
 
 export const todoActions = {
-  add(title: string) {
+  add({ title, priority, dueDate }: NewTodo) {
     const todo: Todo = {
       id: crypto.randomUUID(),
       title,
       done: false,
       createdAt: Date.now(),
+      priority,
+      dueDate,
     };
     save([todo, ...getSnapshot()]);
   },
